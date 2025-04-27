@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sonuçlar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+      @layer utilities {
+        .card {
+          perspective: 1000px;
+          width: 300px; /* Kart genişliği */
+          height: 500px; /* Kart yüksekliği */
+        }
+        .card-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          transform-style: preserve-3d;
+          transition: transform 0.6s;
+        }
+        .card:hover .card-inner {
+          transform: rotateY(180deg);
+        }
+        .card-front,
+        .card-back {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          backface-visibility: hidden;
+          border-radius: 0.5rem;
+          overflow: hidden;
+        }
+        .card-front img {
+          width: 100%;
+          height: 92%;
+        }
+        .card-back {
+          transform: rotateY(180deg);
+          background-color: #1f2937; /* Arka plan rengi */
+          color: #fff;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 1rem;
+        }
+        .card-front h3 {
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white font-sans flex flex-col items-center p-5">
+    <button
+    onclick="window.location.href = window.location.origin + window.location.pathname.replace(/[^\/]+$/, '');"
+    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mb-6"
+  >
+    Baştan Seç
+  </button>
+    <div
+      id="ai-interpretation"
+      class="bg-gray-800 border border-gray-700 rounded-lg p-8 shadow-lg max-w-4xl w-full text-center text-xl mb-8"
+    >
+      Yükleniyor...
+    </div>
+    <h1 class="text-3xl font-bold mb-6 text-gray-100">Seçtiğiniz Kartlar</h1>
+    <div
+      id="selected-cards"
+      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"
+    ></div>
+
+    <script>
+const selected = JSON.parse(localStorage.getItem("selectedCards") || "[]");
+const cardContainer = document.getElementById("selected-cards");
+
+// Kartları göster
+selected.forEach((cardName) => {
+  const cardEl = document.createElement("div");
+  cardEl.className = "card rounded-lg shadow-lg flex flex-col items-center";
+
+  cardEl.innerHTML = `
+    <div class="card-inner">
+      <div class="card-front">
+        <img src="${cardName.Image}" alt="${cardName.Name}" />
+        <h3 class="text-lg font-bold mt-2">${cardName.Name}</h3>
+      </div>
+      <div class="card-back">
+        <h3 class="text-lg font-bold mb-2">${cardName.Name}</h3>
+        <p class="text-lg mb-1">Anlam: ${cardName.Meaning}</p>
+        <p class="text-lg mb-1">Ters Anlam: ${cardName.Reversed}</p>
+        <p class="text-lg mb-1">Astrolojik: ${cardName.Astrological}</p>
+        <p class="text-lg mb-1">Element: ${cardName.Element}</p>
+        <p class="text-lg mb-1">Çakra: ${cardName.Chakra ? cardName.Chakra : "Yok"}</p>
+      </div>
+    </div>
+  `;
+
+  cardContainer.appendChild(cardEl);
+});
+    </script>
+    <script>
+      // AI yorumunu yükle
+
+      const selectedCards = JSON.parse(
+        localStorage.getItem("selectedCards") || "[]"
+      );
+      const spreadTopic = localStorage.getItem("SpreadTopic") || "";
+      const spreadType = localStorage.getItem("spreadType") || "";
+      
+
+      const aiInterpretation = document.getElementById("ai-interpretation");
+      fetch("https://tarrotworker.ismailhand.workers.dev", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cards: selectedCards, spreadTopic, spreadType }),
+      }) // API URL'sini buraya ekleyin
+        .then((response) => response.json())
+        .then((data) => {
+          aiInterpretation.innerHTML = marked.parse(data);
+        })
+        .catch((error) => {
+          console.error("Error fetching AI interpretation:", error);
+          aiInterpretation.innerHTML = "AI yorumunu yüklerken bir hata oluştu.";
+        });
+    </script>
+  </body>
+</html>
