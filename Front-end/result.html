@@ -94,7 +94,7 @@ selected.forEach((cardName) => {
   cardEl.innerHTML = `
     <div class="card-inner">
       <div class="card-front">
-        <img src="${cardName.Image}" alt="${cardName.Name}" />
+        <img src="${cardName.Image}" alt="${cardName.Name}" style="transform: ${cardName.Reversed ? 'rotate(180deg)' : 'none'};" />
         <h3 class="text-lg font-bold mt-2">${cardName.Name}</h3>
       </div>
       <div class="card-back">
