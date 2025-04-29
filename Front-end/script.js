@@ -871,7 +871,7 @@ cardNames.forEach((obj) => {
           }
         }
         break;
-      case "Genel Açılım":
+      case "Klasik Açılım":
         if(selectedCards.length > 5){
           redirectToResults();
         }
