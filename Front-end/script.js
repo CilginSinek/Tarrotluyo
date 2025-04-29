@@ -788,12 +788,25 @@ const cardNames = shuffleArray(defauldCards);
 const container = document.getElementById("card-container");
 const selectedCards = [];
 const redirectToResults = () => {
-  localStorage.setItem("selectedCards", JSON.stringify(selectedCards));
   const selectedSpread = document.querySelector('input[name="spread"]:checked');
   const topicInput = document.getElementById("topic");
 
   if (selectedSpread) {
     localStorage.setItem("spreadType", selectedSpread.value);
+    switch (selectedSpread.value) {
+      case "Tek Açılım":
+        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 1)));
+        break;
+      case "Üçlü Açılım":
+        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 3)));
+        break;
+      case "Klasik Açılım":
+        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 5)));
+        break;
+      case "Kent Açılımı":
+        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 7)));
+        break;
+    }
   }
 
   if (topicInput) {
