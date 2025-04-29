@@ -22,4 +22,9 @@ Basically a tarot card reading web app. It uses OpenAI's GPT-3.5 model to genera
 4. Click the "Get Reading" button to generate your tarot card reading.
 5. The reading will be displayed on the screen.
 
-
+## How to Deploy on Cloudflare Workers
+1. Create a Cloudflare account and set up a new Workers project.
+2. Copy the contents of the `index.html` file into the `index.js` file in your Workers project.
+3. Replace the `YOUR_OPENAI_API_KEY` placeholder with your actual OpenRouter API key.
+4. Deploy the Workers project.
+5. Open the URL of your deployed Workers project in your web browser.
