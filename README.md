@@ -3,7 +3,7 @@
 Basically a tarot card reading web app. It uses OpenAI's GPT-3.5 model to generate tarot card readings based on user input. The app is built using HTML, CSS (with Tailwind), and JavaScript for the frontend, and Cloudflare Workers for the backend.
 
 ## Features
-- Tarot card reading using OpenAI's GPT-3.5 model
+- Tarot card reading using Qwen3-30b-a3b model
 - User-friendly interface with Tailwind CSS
 - Responsive design for mobile and desktop
 - Easy to deploy on Cloudflare Workers
