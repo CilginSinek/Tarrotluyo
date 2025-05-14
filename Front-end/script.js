@@ -1375,6 +1375,7 @@ function displayResults() {
   .then(data => {
     // Remove loading indicator
     loadingElement.remove();
+    apiStatusContainer.remove()
     
     // Display the markdown response
     if (data) {
@@ -1437,27 +1438,20 @@ function displayResults() {
       nameDiv.textContent = `${cardData.Name} ${cardData.isReversed ? "(Ters)" : ""}`;
       cardElement.appendChild(nameDiv);
       
-      // Add meaning based on orientation
-      const meaningDiv = document.createElement("div");
-      meaningDiv.classList.add("text-xs", "mt-1", "font-semibold");
-      meaningDiv.textContent = `Anlam: ${cardData.isReversed ? cardData.Reversed : cardData.Meaning}`;
-      cardElement.appendChild(meaningDiv);
-      
       // Add all card properties if they exist
       const properties = [
-        { name: "Arcana", value: cardData.Arcana },
-        { name: "Takım", value: cardData.Suit },
+        { name: "Anlam", value: cardData.Meaning },
+        { name: "Ters Anlamı", value: cardData.Reversed },
         { name: "Element", value: cardData.Element },
-        { name: "Astroloji", value: cardData.Astrology },
-        { name: "Numeroloji", value: cardData.Numerology },
-        { name: "Anahtar Kelimeler", value: cardData.Keywords }
+        { name: "Astroloji", value: cardData.Astrological },
+        { name: "Çakra", value: cardData.Chakra }
       ];
       
       properties.forEach(prop => {
         if (prop.value) {
           const propDiv = document.createElement("div");
           propDiv.classList.add("text-xs", "mt-1");
-          propDiv.innerHTML = `<span class="font-medium">${prop.name}:</span> ${prop.value}`;
+          propDiv.innerHTML = `<span class="font-bold">${prop.name}:</span> ${prop.value}`;
           cardElement.appendChild(propDiv);
         }
       });
