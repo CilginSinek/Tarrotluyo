@@ -1,4 +1,4 @@
-const defauldCards = [
+const defaultCards = [
   {
     Meaning: "New beginnings, adventure, spontaneity",
     Reversed: "Hesitation, recklessness, fear of change",
@@ -774,6 +774,9 @@ const defauldCards = [
   },
 ];
 
+// ---- UTILITIES ----
+
+// Fisher-Yates shuffle algorithm with reverse card probability
 const shuffleArray = (array) =>
   [...array]
     .map((value) => ({
@@ -783,161 +786,767 @@ const shuffleArray = (array) =>
     .sort((a, b) => a.sort - b.sort)
     .map(({ value }) => value);
 
-const cardNames = shuffleArray(defauldCards);
+// Convert degrees to radians
+const degToRad = (degrees) => {
+  return degrees * (Math.PI / 180);
+};
 
-const container = document.getElementById("card-container");
-const selectedCards = [];
-const redirectToResults = () => {
-  const selectedSpread = document.querySelector('input[name="spread"]:checked');
-  const topicInput = document.getElementById("topic");
+// ---- THREE.JS VARIABLES ----
+let scene, camera, renderer, controls;
+let cardGroup, selectedCardsGroup;
+let cards = [];
+let selectedCards = [];
+let maxSelections = 3;
+let cardBackTexture;
+let cardSize = { width: 1, height: 1.5 };
+let spreadTopic = "Genel Yorum"; // Default topic
+let isSelectionComplete = false;
+let raycaster, mouse;
 
-  if (selectedSpread) {
-    localStorage.setItem("spreadType", selectedSpread.value);
-    switch (selectedSpread.value) {
-      case "Tek Açılım":
-        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 1)));
-        break;
-      case "Üçlü Açılım":
-        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 3)));
-        break;
-      case "Klasik Açılım":
-        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 5)));
-        break;
-      case "Kent Açılımı":
-        localStorage.setItem("selectedCards", JSON.stringify(selectedCards.slice(0, 7)));
-        break;
-    }
-  }
+// Mobile detection
+let isMobile = false;
 
-  if (topicInput) {
-    localStorage.setItem("SpreadTopic", topicInput.value);
-  }
-
-  window.location.href = "result.html";
+// Function to detect if the device is mobile
+function detectMobile() {
+  return window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-
-cardNames.forEach((obj) => {
-  const card = document.createElement("div");
-  card.className = "flip-card w-48 h-72 sm:w-56 sm:h-80 md:w-64 md:h-96"; // Kart yüksekliği artırıldı
-
-  const cardInner = document.createElement("div");
-  cardInner.className = "flip-card-inner relative w-full h-full";
-
-  const cardFront = document.createElement("div");
-  cardFront.className =
-    "flip-card-front absolute w-full h-full bg-gray-800 rounded-lg shadow-lg flex items-center justify-center";
-  const img = document.createElement("img");
-  img.src = obj.Image;
-  img.alt = obj.Name;
-  img.className = "w-full h-full object-cover rounded-lg";
-  if (obj.reversed) {
-    console.log(obj.Name, obj.reversed);
-    img.style.transform = "rotate(180deg)";
+// Function to redirect mobile users to the old version
+function redirectMobileUsers() {
+  if (detectMobile()) {
+    window.location.href = '/oldversion/index.html';
+    return true; // Indicate redirect happened
   }
-  cardFront.appendChild(img);
+  return false; // No redirect needed
+}
 
-  const cardBack = document.createElement("div");
-  cardBack.className =
-    "flip-card-back absolute w-full h-full bg-gray-800 rounded-lg shadow-lg flex items-center justify-center";
-  cardBack.style.backgroundImage =
-    "url('https://static.vecteezy.com/system/resources/previews/008/203/958/large_2x/classic-vintage-frame-decorative-border-frame-free-vector.jpg')";
-  cardBack.style.backgroundSize = "cover";
-  cardBack.style.backgroundPosition = "center";
+// ---- SCENE SETUP ----
 
-  cardInner.appendChild(cardFront);
-  cardInner.appendChild(cardBack);
-  card.appendChild(cardInner);
-
-  card.addEventListener("click", () => {
-    const checkedRadio = document.querySelector(
-      'input[name="spread"]:checked'
+// Function to create a single card with front and back faces
+function createCard(cardData, x, y, z, rotationY) {
+  // Create card group
+  const cardObj = new THREE.Group();
+  cardObj.position.set(x, y, z);
+  cardObj.rotation.y = rotationY;
+  cardObj.userData = { cardData: cardData, flipped: false };
+  
+  // Card dimensions - slightly smaller cards for better fit
+  const width = cardSize.width * 0.95;
+  const height = cardSize.height * 0.95;
+  const thickness = 0.02;
+  
+  // Create card geometry
+  const geometry = new THREE.BoxGeometry(width, height, thickness);
+  
+  // Create materials array for the card
+  const materials = [];
+  
+  // Side materials (thin edges)
+  const edgeMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+  materials.push(edgeMaterial); // right side
+  materials.push(edgeMaterial); // left side
+  materials.push(edgeMaterial); // top side
+  materials.push(edgeMaterial); // bottom side
+  
+  // Create front material with card image if available
+  let frontMaterial;
+  if (cardData.Image) {
+    // Load the card's front image
+    const frontTexture = new THREE.TextureLoader().load(cardData.Image, 
+      // Success callback
+      texture => {
+      console.log(`Loaded front texture for ${cardData.Name}`);
+      if (cardData.reversed) {
+        // Flip the texture vertically if the card is reversed
+        texture.center.set(0.5, 0.5);
+        texture.rotation = Math.PI; // Rotate 180 degrees
+      }
+      },
+      // Progress callback
+      undefined,
+      // Error callback
+      err => {
+      console.error(`Error loading front texture for ${cardData.Name}:`, err);
+      }
     );
-    if (!checkedRadio) {
-      alert("Lütfen önce bir açılım türü seçin!");
-      return;
-    }
+    frontMaterial = new THREE.MeshStandardMaterial({ 
+      map: frontTexture,
+      color: 0xffffff
+    });
+  } else {
+    // Fallback material if no image is available
+    frontMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xdddddd,
+      metalness: 0.1,
+      roughness: 0.5
+    });
+    
+    // Add card name as text if no image
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 384;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#f8f8f8';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#222222';
+    context.font = '20px Arial';
+    context.textAlign = 'center';
+    context.fillText(cardData.Name || 'Unknown Card', canvas.width/2, canvas.height/2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    frontMaterial.map = texture;
+  }
+  
+  // Back material with the card back texture
+  const backMaterial = new THREE.MeshStandardMaterial({ 
+    map: cardBackTexture,
+    color: 0xffffff
+  });
+  
+  // Add front and back materials to the materials array
+  materials.push(frontMaterial); // back face (initially showing)
+  materials.push(backMaterial); // front face (initially hidden)
+  
+  // Create the card mesh with materials
+  const cardMesh = new THREE.Mesh(geometry, materials);
+  cardObj.add(cardMesh);
+  
+  // Add to scene
+  cardGroup.add(cardObj);
+  
+  // Add to cards array for raycasting
+  cards.push(cardObj);
+  
+  // Add card mesh to the card object's userData for raycasting
+  cardObj.userData.cardMesh = cardMesh;
+  // Mark this as not hovered initially
+  cardObj.userData.hovered = false;
+  // Store original position for hover effects
+  cardObj.userData.originalPosition = { x: x, y: y, z: z };
+  
+  return cardObj;
+}
 
-    switch (checkedRadio.value){
-      case "Tek Açılım":
-        if(selectedCards.length > 1){
-          redirectToResults();
-        }else{
-          if (!card.classList.contains("open")) {
-            card.classList.add("open"); // Kartı aç
-            selectedCards.push(obj); // Seçilen kartı listeye ekle
-            redirectToResults();
-          }
+function initThreeJS() {
+  console.log("Initializing Three.js environment");
+  
+  // Show loading indicator
+  document.getElementById("loading").classList.add("visible");
+
+  // The mobile check is now done on page load, but we'll keep a safety check here too
+  if (detectMobile()) {
+    redirectMobileUsers();
+    return; // Stop initialization if redirected
+  }
+  
+  // Desktop only from this point
+  isMobile = false; // Safety reset to ensure desktop layout
+  
+  // Create scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x12101c);
+
+  // Setup camera - desktop only now
+  camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.z = 5;
+  camera.position.y = 1;
+
+  // Setup renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  document.getElementById("cards-container").appendChild(renderer.domElement);
+  document.getElementById("cards-container").classList.remove("hidden");
+
+  // Setup controls - disabled to prevent user from moving camera
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enabled = false; // Disable controls
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.screenSpacePanning = false;
+  controls.minDistance = 3;
+  controls.maxDistance = 10;
+  controls.maxPolarAngle = Math.PI / 2;
+
+  // Card groups
+  cardGroup = new THREE.Group();
+  selectedCardsGroup = new THREE.Group();
+  scene.add(cardGroup);
+  scene.add(selectedCardsGroup);
+
+  // Lighting
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(0, 10, 5);
+  directionalLight.castShadow = true;
+  scene.add(directionalLight);
+
+  // Setup for raycasting (card selection)
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  // Setup event listeners
+  window.addEventListener("resize", onWindowResize);
+  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("click", onMouseClick);
+
+  // Set a fallback texture for error cases
+  cardBackTexture = new THREE.Texture();
+  cardBackTexture.needsUpdate = true;
+
+  // Load card back texture with error handling
+  const textureLoader = new THREE.TextureLoader();
+  textureLoader.load(
+    // URL - Using a reliable source
+    "https://static.vecteezy.com/system/resources/previews/008/203/958/large_2x/classic-vintage-frame-decorative-border-frame-free-vector.jpg",
+    // onLoad callback
+    (texture) => {
+      console.log("Card back texture loaded successfully");
+      cardBackTexture = texture;
+      // Create cards once texture is loaded
+      createCards(defaultCards);
+      animate();
+
+      // Hide loading indicator
+      document.getElementById("loading").classList.remove("visible");
+    },
+    // onProgress callback
+    undefined,
+    // onError callback
+    (err) => {
+      console.error("Error loading card back texture:", err);
+      // Create cards with default texture
+      createCards(defaultCards);
+      animate();
+
+      // Hide loading indicator
+      document.getElementById("loading").classList.remove("visible");
+    }
+  );
+}
+
+// Function to create all tarot cards
+function createCards(cardsData) {
+  console.log("Creating", cardsData.length, "cards");
+  // Shuffle all 78 cards in the deck
+  const shuffledCards = shuffleArray(cardsData);
+  
+  // Desktop layout only
+  createDesktopCardLayout(shuffledCards);
+}
+
+// Desktop card layout - semi-circular arrangement
+function createDesktopCardLayout(shuffledCards) {
+  // Define rows configuration for semi-circular arrangement - back to original 3 rows
+  const rows = 3; 
+  const cardsPerRow = Math.ceil(shuffledCards.length / rows);
+  
+  // Create cards and arrange them in rows - original 3-row arrangement
+  for (let row = 0; row < rows; row++) {
+    // Increased spacing with 3 rows - more spread out
+    const rowRadius = 4 + row * 1.2; // Increased from 0.8 to 1.2 for more spread
+    
+    // Adjusted vertical positions
+    const rowElevation = -3 + row * 0.6; // Increased from 0.5 to 0.6
+    const rowCards = Math.min(cardsPerRow, shuffledCards.length - row * cardsPerRow);
+    
+    // Calculate the angle span - wider spread as requested
+    const totalAngleSpan = degToRad(150); // Increased from 120 to 150 degree span
+    const anglePerCard = totalAngleSpan / (rowCards - 1 || 1); // Original spacing
+    const startAngle = -totalAngleSpan / 2;
+    
+    for (let i = 0; i < rowCards; i++) {
+      const cardIndex = row * cardsPerRow + i;
+      if (cardIndex >= shuffledCards.length) break;
+      
+      const cardData = shuffledCards[cardIndex];
+      
+      // Create card - using rowElevation to position lower
+      const card = createCard(
+        cardData,
+        Math.sin(startAngle + i * anglePerCard) * rowRadius,
+        rowElevation, // Lower position
+        -Math.cos(startAngle + i * anglePerCard) * rowRadius,
+        Math.PI - (startAngle + i * anglePerCard)
+      );
+      
+      // Tilt the cards slightly for a better 3D effect
+      card.rotation.x = degToRad(10 + row * 5); // Each row tilted slightly more
+    }
+  }
+}
+
+function onWindowResize() {
+  // Desktop-only resize handler
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function onMouseMove(event) {
+  // Calculate mouse position in normalized device coordinates
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
+  // Only handle hover effects if not in selection complete state
+  if (!isSelectionComplete) {
+    // Check for intersections with cards
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(cards, true); // true = recursive, check children
+    
+    // Reset all cards that were previously hovered
+    cards.forEach(card => {
+      if (card.userData.hovered && !card.userData.selected) {
+        // Make sure originalPosition exists before using it
+        if (card.userData.originalPosition) {
+          // Lower the card back to its original position
+          gsap.to(card.position, {
+            y: card.userData.originalPosition.y,
+            duration: 0.2
+          });
+          card.userData.hovered = false;
         }
-        break;
-      case "Üçlü Açılım":
-        if(selectedCards.length > 3){
-          // redirect results page
+      }
+    });
+    
+    // If we're hovering over a card
+    if (intersects.length > 0) {
+      // Get the actual card object (might be the mesh or the group)
+      let hoveredCard = intersects[0].object;
+      
+      // If we hit a mesh, find its parent (the card group)
+      if (!cards.includes(hoveredCard)) {
+        // Go up the parent chain until we find an object in the cards array
+        while (hoveredCard && !cards.includes(hoveredCard)) {
+          hoveredCard = hoveredCard.parent;
         }
-        else{
-          if (!card.classList.contains("open")) {
-            card.classList.add("open"); // Kartı aç
-            selectedCards.push(obj); // Seçilen kartı listeye ekle
-            if(selectedCards.length == 3){
-              redirectToResults();
-            }
-          }
+      }
+      
+      // If we found a valid card and it's not already selected
+      if (hoveredCard && !hoveredCard.userData.selected) {
+        // Check if originalPosition exists before trying to use it
+        if (hoveredCard.userData.originalPosition) {
+          // Lift the card slightly to indicate it can be selected
+          gsap.to(hoveredCard.position, {
+            y: hoveredCard.userData.originalPosition.y + 0.2, // Lift by 0.2 units
+            duration: 0.2
+          });
+          hoveredCard.userData.hovered = true;
         }
-        break;
-      case "Klasik Açılım":
-        if(selectedCards.length > 5){
-          redirectToResults();
-        }
-        else{
-          if (!card.classList.contains("open")) {
-            card.classList.add("open"); // Kartı aç
-            selectedCards.push(obj); // Seçilen kartı listeye ekle
-            if(selectedCards.length == 5){
-              redirectToResults();
-            }
-          }
-        }
-        break;
-      case "Kent Açılımı":
-        if(selectedCards.length > 7){
-          redirectToResults();
-        }
-        else{
-          if (!card.classList.contains("open")) {
-            card.classList.add("open"); // Kartı aç
-            selectedCards.push(obj); // Seçilen kartı listeye ekle
-            if(selectedCards.length == 7){
-              redirectToResults();
-            }
-          }
-        }
-        break;
+      }
+    }
+  }
+}
+
+function onMouseClick() {
+  // Don't process clicks if selection is already complete or we have enough cards
+  if (isSelectionComplete || selectedCards.length >= maxSelections) return;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(cards, true); // true = recursive, check children
+
+  // Only process the click if it actually hits a card
+  if (intersects.length > 0) {
+    // Get the actual card object (might be the mesh or the group)
+    let selectedCard = intersects[0].object;
+    
+    // If we hit a mesh, find its parent (the card group)
+    if (!cards.includes(selectedCard)) {
+      // Go up the parent chain until we find an object in the cards array
+      while (selectedCard && !cards.includes(selectedCard)) {
+        selectedCard = selectedCard.parent;
+      }
+    }
+    
+    // Check if we found a valid card, if it's not already selected, and if it's visible
+    if (selectedCard && !selectedCards.includes(selectedCard) && selectedCard.visible) {
+      // Make sure cardData exists before trying to log its name
+      if (selectedCard.userData && selectedCard.userData.cardData) {
+        // Randomly determine if card is reversed (20% chance)
+        const isReversed = Math.random() < 0.2;
+        selectedCard.userData.reversed = isReversed;
+        console.log("Card selected:", selectedCard.userData.cardData.Name, isReversed ? "(Ters)" : "");
+      } else {
+        console.log("Card selected");
+      }
+      // Select this card
+      selectCard(selectedCard);
+    }
+  }
+}
+
+function selectCard(card) {
+  // Mark card as selected
+  card.userData.selected = true;
+  selectedCards.push(card);
+  
+  // Make sure it's no longer considered hovered
+  card.userData.hovered = false;
+
+    // Update selection counter
+    updateSelectionInfo();
+
+    // First flip the card to reveal front side
+    gsap.to(card.rotation, {
+      y: card.userData.originalRotation + Math.PI,
+      // If card is reversed, also rotate it upside down
+      z: card.userData.reversed ? Math.PI : 0,
+      duration: 0.6,
+      ease: "power2.inOut",
+      onComplete: () => {
+        // Fixed spacing for desktop
+        const spacing = 1.2;
+        const offsetX =
+          (selectedCards.length - 1) * spacing -
+          ((maxSelections - 1) * spacing) / 2;
+        
+        // Position selected cards
+        const yPos = 2.5;
+
+        gsap.to(card.position, {
+          x: offsetX,
+          y: yPos,
+          z: 0,  // Bring cards forward to center
+          duration: 0.8,
+          ease: "power2.out",
+        });
+        
+        // Adjust rotation to face camera
+        gsap.to(card.rotation, {
+          x: 0,
+          y: 0,
+          z: 0,
+          duration: 0.8,
+        });
+      },
+    });
+
+    // Check if we've selected exact number of cards as chosen in the form
+    updateSelectionInfo();
+    if (selectedCards.length === maxSelections) {
+      setTimeout(completeSelection, 1500);
+    }
+  }
+
+function completeSelection() {
+  // Hide unselected cards
+  cards.forEach((card) => {
+    if (!card.userData.selected) {
+      gsap.to(card.scale, {
+        x: 0,
+        y: 0,
+        z: 0,
+        duration: 0.5,
+      });
     }
   });
 
-  container.appendChild(card);
-});
+  // Adjust camera position - desktop only
+  gsap.to(camera.position, {
+    y: 1.5,
+    z: 7,
+    duration: 1.2,
+  });
 
+  // Ensure cards are properly arranged side by side at the bottom
+  setTimeout(() => {
+    // Arrange selected cards side by side with device-specific placement
+    const spacing = 1.3; // Smaller spacing for desktop
+    selectedCards.forEach((card, index) => {
+      const posX = (index - (selectedCards.length - 1) / 2) * spacing;
+      
+      // Position cards - desktop only
+      const yPos = 2.5;
 
+      gsap.to(card.position, {
+        x: posX,
+        y: yPos, // Higher up on mobile to stay visible
+        z: 0,
+        duration: 0.8,
+        ease: "power2.inOut",
+        onComplete: () => {
+          if (index === selectedCards.length - 1) {
+            displayResults();
+          }
+        },
+      });
+      
+      // No mobile-specific scaling needed
+    });
+  }, 800);
+}
 
+function displayResults() {
+  // Clear any existing content
+  resultsContent.innerHTML = '';
+  
+  // Add topic (smaller style)
+  const nameElement = document.createElement("p");
+  nameElement.textContent = spreadTopic ? `"${spreadTopic}" için Tarot Açılımı` : "Tarot Açılımı";
+  nameElement.classList.add("text-base", "font-bold", "mb-2");
+  resultsContent.appendChild(nameElement);
 
-document.getElementById("see-results").addEventListener("click", redirectToResults);
+  // Process card data, including all properties
+  const selectedCardData = selectedCards.map(card => {
+    const cardData = card.userData.cardData || card.userData;
+    return {
+      ...cardData,
+      isReversed: card.userData.reversed
+    };
+  });
+  
+  // Create loading indicator
+  const loadingElement = document.createElement("div");
+  loadingElement.textContent = "Tarot yorumu alınıyor...";
+  loadingElement.classList.add("text-center", "py-2");
+  resultsContent.appendChild(loadingElement);
+  
+  // Create element for API response markdown - Put this at the top
+  const apiResponseElement = document.createElement("div");
+  apiResponseElement.classList.add("mb-4", "p-3", "border", "rounded", "bg-white");
+  // Clear results content
+  resultsContent.innerHTML = "";
 
-document.addEventListener("DOMContentLoaded", () => {
-  const savedSpreadType = localStorage.getItem("spreadType");
-  const savedSpreadTopic = localStorage.getItem("SpreadTopic");
+  // Create a prominent API status indicator
+  const apiStatusContainer = document.createElement("div");
+  apiStatusContainer.classList.add("mb-6", "p-4", "bg-purple-50", "border", "border-purple-200", "rounded-lg", "text-center");
+  apiStatusContainer.innerHTML = '<p class="text-lg font-bold">Tarot yorumu alınıyor...</p><p class="text-sm mt-1">Kartlarınız hazır, yorum için API bekleniyor.</p>';
+  resultsContent.appendChild(apiStatusContainer);
 
-  if (savedSpreadType) {
-    const radioButtons = document.querySelectorAll('input[name="spread"]');
-    radioButtons.forEach((radio) => {
-      if (radio.value === savedSpreadType) {
-        radio.checked = true;
+  // Create container for API results (interpretation)
+  const interpretationContainer = document.createElement("div");
+  interpretationContainer.classList.add("mb-6");
+  resultsContent.appendChild(interpretationContainer);
+
+  // Create container for selected cards
+  const cardGridElement = document.createElement("div");
+  cardGridElement.classList.add(
+    "grid",
+    "grid-cols-1",
+    "sm:grid-cols-2",
+    "md:grid-cols-3",
+    "lg:grid-cols-4",
+    "gap-2",
+    "mt-4"
+  );
+  // Show cards immediately, don't wait for API
+  cardGridElement.style.display = "grid";
+  resultsContent.appendChild(cardGridElement);
+
+  // Determine spread type based on selection
+  let spreadType;
+  switch(maxSelections) {
+    case 1:
+      spreadType = "Tekli Açılım";
+      break;
+    case 3:
+      spreadType = "Üçlü Açılım";
+      break;
+    case 5:
+      spreadType = "Genel Açılım";
+      break;
+    case 7:
+      spreadType = "Kent Açılımı";
+      break;
+    default:
+      spreadType = "Genel Açılım";
+  }
+  
+  // Make API call to get markdown interpretation
+  fetch("https://tarrotworker.ismailhand.workers.dev", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ 
+      cards: selectedCardData, 
+      spreadTopic: spreadTopic || "Genel Yorum", 
+      spreadType: spreadType 
+    }),
+  })
+  .then(response => response.json())
+  .then(data => {
+    // Remove loading indicator
+    loadingElement.remove();
+    
+    // Display the markdown response
+    if (data) {
+      // Simple markdown conversion (for more complex markdown, use a library)
+      const htmlContent = data
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+      
+      interpretationContainer.innerHTML = htmlContent;
+    } else {
+      interpretationContainer.textContent = "Tarot yorumu alınamadı.";
+    }
+  })
+  .catch(error => {
+    console.error("API error:", error);
+    loadingElement.remove();
+    interpretationContainer.textContent = "Tarot yorumu alınırken bir hata oluştu.";
+  });
+  
+  // Function to display selected cards in a grid
+  function showSelectedCards(cards, container) {
+    // Always display container immediately
+    container.style.display = "grid";
+    
+    // Add a subtle header for the cards section
+    const cardsHeader = document.createElement("div");
+    cardsHeader.classList.add("col-span-full", "text-sm", "font-medium", "text-gray-700", "mb-1");
+    cardsHeader.textContent = "Seçilen Kartlar";
+    container.appendChild(cardsHeader);
+
+    // Create a card element for each card
+    cards.forEach((cardData) => {
+      const cardElement = document.createElement("div");
+      cardElement.classList.add(
+        "bg-white",
+        "rounded-lg",
+        "shadow-md",
+        "p-3",
+        "flex",
+        "flex-col",
+        "items-center"
+      );
+      
+      // Create card image element with proper orientation
+      const cardImg = document.createElement("img");
+      cardImg.src = cardData.Image;
+      cardImg.alt = cardData.Name;
+      cardImg.classList.add("w-24", "h-auto", "mb-2", "object-contain");
+      if (cardData.isReversed) {
+        cardImg.classList.add("transform", "rotate-180");
       }
+      
+      cardElement.appendChild(cardImg);
+      
+      // Add card name and basic meaning
+      const nameDiv = document.createElement("div");
+      nameDiv.classList.add("font-medium", "text-center", "text-sm", "mb-1");
+      nameDiv.textContent = `${cardData.Name} ${cardData.isReversed ? "(Ters)" : ""}`;
+      cardElement.appendChild(nameDiv);
+      
+      // Add meaning based on orientation
+      const meaningDiv = document.createElement("div");
+      meaningDiv.classList.add("text-xs", "mt-1", "font-semibold");
+      meaningDiv.textContent = `Anlam: ${cardData.isReversed ? cardData.Reversed : cardData.Meaning}`;
+      cardElement.appendChild(meaningDiv);
+      
+      // Add all card properties if they exist
+      const properties = [
+        { name: "Arcana", value: cardData.Arcana },
+        { name: "Takım", value: cardData.Suit },
+        { name: "Element", value: cardData.Element },
+        { name: "Astroloji", value: cardData.Astrology },
+        { name: "Numeroloji", value: cardData.Numerology },
+        { name: "Anahtar Kelimeler", value: cardData.Keywords }
+      ];
+      
+      properties.forEach(prop => {
+        if (prop.value) {
+          const propDiv = document.createElement("div");
+          propDiv.classList.add("text-xs", "mt-1");
+          propDiv.innerHTML = `<span class="font-medium">${prop.name}:</span> ${prop.value}`;
+          cardElement.appendChild(propDiv);
+        }
+      });
+      
+      container.appendChild(cardElement);
     });
   }
 
-  if (savedSpreadTopic) {
-    const topicInput = document.getElementById("topic");
-    topicInput.value = savedSpreadTopic;
+  // Show selected cards immediately
+  showSelectedCards(selectedCardData, cardGridElement);
+
+  // Add button to restart
+  const restartButton = document.createElement("button");
+  restartButton.textContent = "Yeni Açılım Yap";
+  restartButton.classList.add(
+    "mt-4",
+    "bg-indigo-600",
+    "text-white",
+    "py-1",
+    "px-3",
+    "rounded",
+    "text-sm"
+  );
+  restartButton.addEventListener("click", resetApp);
+  resultsContent.appendChild(restartButton);
+
+  // Show results container with animation
+  const resultContainer = document.getElementById("result-container");
+  resultContainer.style.display = "block";
+  gsap.from(resultContainer, {
+    y: -100,
+    opacity: 0,
+    duration: 0.8,
+  });
+}
+
+function resetApp() {
+  // Reload the page to restart
+  window.location.reload();
+}
+
+function updateSelectionInfo() {
+  const selectionInfo = document.getElementById("selection-info");
+  selectionInfo.style.display = "block";
+  selectionInfo.textContent = `Kart seçin: ${selectedCards.length}/${maxSelections}`;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Update controls
+  controls.update();
+
+  // Render scene
+  renderer.render(scene, camera);
+}
+
+// Initialize resultsContent element for card results
+let resultsContent;
+
+// ---- EVENT LISTENERS ----
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Check if user is on mobile and redirect if needed - do this FIRST before any other initialization
+  if (redirectMobileUsers()) {
+    return; // Stop further initialization if redirected
   }
+  
+  // Initialize the resultsContent variable on page load
+  resultsContent = document.getElementById("results-content");
+  const tarotForm = document.getElementById("tarot-form");
+
+  tarotForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    // Get spread topic and selection
+    spreadTopic = document.getElementById("spread-topic").value;
+    const spreadValue = document.querySelector(
+      'input[name="spread"]:checked'
+    ).value;
+    maxSelections = parseInt(spreadValue);
+
+    // Hide form, show cards
+    document.getElementById("form-container").style.display = "none";
+
+    // Initialize Three.js scene
+    initThreeJS();
+
+    // Show selection info
+    updateSelectionInfo();
+  });
 });

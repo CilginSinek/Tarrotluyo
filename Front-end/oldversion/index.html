@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tarot Kartları</title>
+    <link rel="shortcut icon" href="../tarot-card.png" type="image/x-icon" />
+    <meta property="og:title" content="Tarot Kartları - Tarrotluyo" />
+    <meta property="og:description" content="Tarot kartlarınızı seçin ve geleceğinizi keşfedin. Tarot açılımları ve yorumları burada!" />
+    <meta property="og:image" content="../tarot-card.png" />
+    <meta property="og:url" content="https://cilginsinek.github.io/Tarrotluyo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tarot Kartları - Tarrotluyo" />
+    <meta name="twitter:description" content="Tarot kartlarınızı seçin ve geleceğinizi keşfedin. Tarot açılımları ve yorumları burada!" />
+    <meta name="twitter:image" content="../tarot-card.png" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      /* Tailwind ile özel animasyon */
+      @layer utilities {
+        .flip-card {
+          perspective: 1000px;
+        }
+        .flip-card-inner {
+          transform-style: preserve-3d;
+          transition: transform 0.8s;
+          transform: rotateY(180deg); /* Başlangıçta kapalı */
+        }
+        .flip-card.open .flip-card-inner {
+          transform: rotateY(0deg); /* Tıklanınca açılma */
+        }
+        .flip-card-front,
+        .flip-card-back {
+          backface-visibility: hidden;
+        }
+        .flip-card-back {
+          transform: rotateY(180deg);
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white font-sans flex flex-col items-center p-5 " style="font-family: 'Inter', sans-serif;"></body>
+    <form id="tarot-form" class="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-lg max-w-md w-full">
+      <input
+        type="text"
+        id="topic"
+        placeholder="Yorumlanacak konu"
+        class="w-full p-3 mb-4 border border-gray-600 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+      />
+      <div class="flex flex-col gap-3">
+        <label class="flex items-center gap-2">
+          <input type="radio" name="spread" value="Tek Açılım" class="text-orange-500 focus:ring-orange-500" />
+          <span>Tek Açılım</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="spread" value="Üçlü Açılım" class="text-orange-500 focus:ring-orange-500" />
+          <span>Üçlü Açılım</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="spread" value="Klasik Açılım" class="text-orange-500 focus:ring-orange-500" />
+          <span>Klasik Açılım (5 Kart)</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="spread" value="Kent Açılımı" class="text-orange-500 focus:ring-orange-500" />
+          <span>Kent Açılımı (7 Kart)</span>
+        </label>
+      </div>
+    </form>
+    <h2 class="text-3xl font-bold mt-8 mb-4 text-gray-100">Tarot Kartınızı Seçin</h2>
+    <div id="card-container" class="flex flex-wrap justify-center gap-4"></div>
+    <script src="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
