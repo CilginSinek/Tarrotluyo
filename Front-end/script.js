@@ -814,7 +814,7 @@ function detectMobile() {
 // Function to redirect mobile users to the old version
 function redirectMobileUsers() {
   if (detectMobile()) {
-    window.location.href = '/oldversion/index.html';
+    window.location.href = '/Tarrotluyo/oldversion/index.html';
     return true; // Indicate redirect happened
   }
   return false; // No redirect needed
